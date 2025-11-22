@@ -1,0 +1,10 @@
+.venv/
+.env
+BB_Circulars_Downloads/
+__pycache__/
+output_texts/
+downloads/
+*.pyc
+.DS_Store
+.vscode/
+.env/
