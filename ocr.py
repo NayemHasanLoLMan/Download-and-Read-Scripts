@@ -22,10 +22,21 @@ OUTPUT_PDF_DIR = os.path.join(INPUT_DIR, "converted_pdfs")
 os.makedirs(OUTPUT_TEXT_DIR, exist_ok=True)
 
 
+def get_processed_files():
+    """Get list of already processed PDF files"""
+    processed = set()
+    if os.path.exists(OUTPUT_TEXT_DIR):
+        for txt_file in Path(OUTPUT_TEXT_DIR).glob("*.txt"):
+            # Get the original PDF name (remove .txt extension)
+            pdf_name = txt_file.stem
+            processed.add(pdf_name)
+    return processed
+
+
 def extract_text_from_pdf(pdf_path):
     """Extract text from PDF using Gemini 2.0 Flash with enhanced vision"""
     try:
-        print(f"Processing: {os.path.basename(pdf_path)}")
+        print(f"  Processing: {os.path.basename(pdf_path)}")
         
         # Upload PDF to Gemini
         uploaded_file = genai.upload_file(pdf_path)
@@ -61,7 +72,7 @@ def extract_text_from_pdf(pdf_path):
         return response.text
     
     except Exception as e:
-        print(f" Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return None
 
 
@@ -70,30 +81,47 @@ def save_text_to_file(text, output_path):
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(text)
-        print(f" Saved: {os.path.basename(output_path)}")
+        print(f"Saved: {os.path.basename(output_path)}")
         return True
     except Exception as e:
-        print(f" Error saving: {str(e)}")
+        print(f"Error saving: {str(e)}")
         return False
 
 
 def process_all_pdfs():
-    """Process all PDFs in the input directory"""
+    """Process all PDFs in the input directory, skipping already processed ones"""
     # Find all PDF files
-    pdf_files = list(Path(INPUT_DIR).glob("*.pdf"))
+    all_pdf_files = list(Path(INPUT_DIR).glob("*.pdf"))
     
-    if not pdf_files:
+    if not all_pdf_files:
         print(f"No PDF files found in {INPUT_DIR}")
         return
     
-    print(f"Found {len(pdf_files)} PDF files to process\n")
+    # Get already processed files
+    processed_files = get_processed_files()
+    
+    # Filter out already processed PDFs
+    pdf_files = [pdf for pdf in all_pdf_files if pdf.stem not in processed_files]
+    
+    print("PDF TEXT EXTRACTION WITH GEMINI 2.0 FLASH")
+    print(f"Total PDF files found: {len(all_pdf_files)}")
+    print(f"Already processed: {len(processed_files)}")
+    print(f"Remaining to process: {len(pdf_files)}")
+
+    
+    if not pdf_files:
+        print("\nAll files have already been processed!")
+        print(f"Text files location: {OUTPUT_TEXT_DIR}")
+        return
+    
+    print(f"\nResuming extraction...\n")
     
     successful = 0
     failed = 0
     
     for idx, pdf_path in enumerate(pdf_files, 1):
         try:
-            print(f"\n[{idx}/{len(pdf_files)}] {pdf_path.name}")
+            print(f"[{idx}/{len(pdf_files)}] {pdf_path.name}")
             
             filename = pdf_path.stem
             
@@ -114,13 +142,23 @@ def process_all_pdfs():
             time.sleep(0.5)
         
         except Exception as e:
-            print(f" Error processing: {str(e)}")
+            print(f"Error processing: {str(e)}")
             failed += 1
+        
+        except KeyboardInterrupt:
+            print("\n\nProcess interrupted by user")
+            print(f"Successfully extracted: {successful}")
+            print(f"Failed: {failed}")
+            print(f"Text files saved in: {OUTPUT_TEXT_DIR}")
+            return
     
+
     print("PROCESSING COMPLETE!")
-    print(f"Successfully extracted: {successful}")
-    print(f"Failed: {failed}")
+    print(f"Successfully extracted (this session): {successful}")
+    print(f"Failed (this session): {failed}")
+    print(f"Total processed: {len(processed_files) + successful}")
     print(f"\nText files saved in:\n   {OUTPUT_TEXT_DIR}")
+
 
 
 if __name__ == "__main__":    
